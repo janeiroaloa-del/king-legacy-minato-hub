@@ -1,1 +1,224 @@
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local TeleportService = game:GetService("TeleportService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Configs
+local Window = getgenv().Library.CreateLib("Minato King Legacy ULTIMATE FARM", "DarkTheme")
+
+-- Vars
+local farmEnabled = false
+local currentTask = "idle"
+local savePosition = rootPart.CFrame
+
+-- POSIÇÕES IMPORTANTES (King Legacy Update 9+)
+local POSITIONS = {
+    -- Ilhas principais
+    ["Spawn"] = CFrame.new(-20, 73, 0),
+    ["Green Zone"] = CFrame.new(0, 73, 0),
+    ["Haunted Island"] = CFrame.new(-2850, 73, 2500),
+    ["Usopp Island"] = CFrame.new(-4000, 73, -3500),
+    ["Marine Fortress"] = CFrame.new(3800, 73, -3000),
+    ["Skypiea"] = CFrame.new(0, 2000, 0),
+    
+    -- Boss spawns
+    ["Thunder God"] = CFrame.new(-5000, 73, 500),
+    ["Thunder God 2"] = CFrame.new(-5200, 73, 600),
+    ["Cake Prince"] = CFrame.new(5500, 73, -3000),
+    ["Longma"] = CFrame.new(6500, 73, -3800),
+    
+    -- Quest givers
+    ["Daily Quest"] = CFrame.new(50, 73, 100),
+    ["Race V2"] = CFrame.new(-100, 73, 200),
+    ["Bounty Quest"] = CFrame.new(200, 73, 150),
+}
+
+-- Remotes King Legacy
+local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+local combatRemote = remotes and remotes:FindFirstChild("CommF_")
+
+-- TABS
+local FarmTab = Window:NewTab("🌟 Auto Farm")
+local CombatTab = Window:NewTab("⚔️ Combat")
+local QuestTab = Window:NewTab("📜 Quests")
+local MovementTab = Window:NewTab("🚀 Movement")
+
+-- FARM TAB
+local FarmSection = FarmTab:NewSection("Auto Farm")
+FarmSection:NewToggle("Auto Farm Level/Items", "Coleta tudo + XP", function(state)
+    farmEnabled = state
+    currentTask = state and "farm_level" or "idle"
+end)
+
+FarmSection:NewToggle("Auto Collect Fruits/Weapons", "Pega TODOS itens", function(state)
+    getgenv().autoCollect = state
+end)
+
+-- COMBAT TAB
+local BossSection = CombatTab:NewSection("Boss Farm")
+BossSection:NewToggle("Auto Bosses", "Mata todos bosses", function(state)
+    getgenv().autoBoss = state
+end)
+BossSection:NewButton("Teleport Boss Atual", "Vai pro boss mais próximo", function()
+    rootPart.CFrame = POSITIONS["Thunder God"]
+end)
+
+local BountySection = CombatTab:NewSection("Bounty")
+BountySection:NewToggle("Auto Bounty Farm", "TP + mata players", function(state)
+    getgenv().autoBounty = state
+end)
+
+-- QUEST TAB
+local QuestSection = QuestTab:NewSection("Quests Auto")
+QuestSection:NewToggle("Daily Quests", "Missões diárias", function(state)
+    getgenv().autoDaily = state
+end)
+
+QuestSection:NewToggle("Race V2 Quests", "Raça V2 completa", function(state)
+    getgenv().autoRaceV2 = state
+end)
+
+QuestSection:NewToggle("V2 Items Quests", "Sea Beast + itens V2", function(state)
+    getgenv().autoV2Items = state
+end)
+
+-- MOVEMENT
+local MoveSection = MovementTab:NewSection("Movement")
+MoveSection:NewToggle("Fly", "Voa", function(state)
+    getgenv().flyEnabled = state
+end)
+MoveSection:NewSlider("Speed", "Velocidade", 500, 16, function(s)
+    humanoid.WalkSpeed = s
+end)
+MoveSection:NewButton("Save Position", "Salva posição", function()
+    savePosition = rootPart.CFrame
+end)
+MoveSection:NewButton("Teleport Home", "Volta pra posição salva", function()
+    rootPart.CFrame = savePosition
+end)
+
+-- FUNÇÕES PRINCIPAIS
+local function tpTo(pos)
+    rootPart.CFrame = pos
+    wait(0.5)
+end
+
+local function collectNearby()
+    for _, obj in pairs(Workspace:GetChildren()) do
+        if obj.Name:lower():find("fruit") or obj.Name:lower():find("weapon") or obj.Name:lower():find("coin") then
+            if (obj.Position - rootPart.Position).Magnitude < 50 then
+                rootPart.CFrame = CFrame.new(obj.Position + Vector3.new(0,5,0))
+                fireclickdetector(obj:FindFirstChildOfClass("ClickDetector"))
+            end
+        end
+    end
+end
+
+local function attackTarget(target)
+    if target and target:FindFirstChild("HumanoidRootPart") then
+        rootPart.CFrame = target.HumanoidRootPart.CFrame * CFrame.new(0,0,-5)
+        -- M1 spam
+        for i=1,5 do
+            VirtualInputManager:SendMouseButtonEvent(0,0,0,true,game,0)
+            wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(0,0,0,false,game,0)
+            wait(0.1)
+        end
+        -- Skills
+        for _, key in pairs({"Z","X","C","V"}) do
+            keypress(key:byte())
+            wait(0.2)
+            keyrelease(key:byte())
+        end
+    end
+end
+
+local function farmBosses()
+    local bosses = Workspace:FindFirstChild("Enemies") or Workspace:FindFirstChild("Bosses")
+    if bosses then
+        for _, boss in pairs(bosses:GetChildren()) do
+            if boss:FindFirstChild("Humanoid") and boss.Humanoid.Health > 0 then
+                attackTarget(boss)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- MAIN LOOP
+spawn(function()
+    while wait(0.1) do
+        if farmEnabled then
+            collectNearby()
+            farmBosses()
+        end
+        
+        if getgenv().autoBoss then
+            farmBosses()
+        end
+        
+        if getgenv().autoBounty then
+            local target = nil
+            local minDist = 100
+            for _, p in pairs(Players:GetPlayers()) do
+                if p \~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (p.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude
+                    if dist < minDist then
+                        target = p.Character
+                        minDist = dist
+                    end
+                end
+            end
+            if target then attackTarget(target) end
+        end
+        
+        if getgenv().flyEnabled then
+            local bv = rootPart:FindFirstChild("FlyBV") or Instance.new("BodyVelocity")
+            bv.Name = "FlyBV"
+            bv.MaxForce = Vector3.new(4000,4000,4000)
+            bv.Velocity = humanoid.MoveDirection * 50
+            bv.Parent = rootPart
+        end
+    end
+end)
+
+-- Quest Loop
+spawn(function()
+    while wait(5) do
+        if getgenv().autoDaily then
+            tpTo(POSITIONS["Daily Quest"])
+            -- Simula aceitar/completar daily
+            keypress(string.byte("E"))
+            wait(1)
+        end
+        
+        if getgenv().autoRaceV2 then
+            tpTo(POSITIONS["Race V2"])
+            keypress(string.byte("E"))
+            wait(2)
+        end
+    end
+end)
+
+-- Anti-AFK
+spawn(function()
+    while wait(60) do
+        local msg = Instance.new("Message")
+        msg.Text = "Minato Farm Hub ativo"
+        msg.Parent = Workspace
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Anti-AFK";
+            Text = "Farm ativo!";
+        })
+    end
+end)
 kinglegacy-aimbot-combo.lua
